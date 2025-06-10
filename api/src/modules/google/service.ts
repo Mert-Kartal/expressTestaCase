@@ -1,6 +1,10 @@
-export const google_client_id = process.env.GOOGLE_CLIENT_ID!;
-export const google_client_secret = process.env.GOOGLE_CLIENT_SECRET!;
-export const google_redirect_uri = process.env.GOOGLE_REDIRECT_URI!;
+import axios from "axios";
+import {
+  google_client_id,
+  google_client_secret,
+  google_redirect_uri,
+} from "../../config/data";
+import { GoogleTokenResponse } from "./types";
 
 export function getGoogleAuthURL() {
   const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -17,4 +21,33 @@ export function getGoogleAuthURL() {
   };
   const params = new URLSearchParams(options).toString();
   return `${rootUrl}?${params}`;
+}
+
+export async function getGoogleOAuthToken(
+  code: string
+): Promise<GoogleTokenResponse> {
+  const url = "https://oauth2.googleapis.com/token";
+  const options = {
+    code,
+    client_id: google_client_id,
+    client_secret: google_client_secret,
+    redirect_uri: google_redirect_uri,
+    grant_type: "authorization_code",
+  };
+
+  try {
+    const response = await axios.post<GoogleTokenResponse>(
+      url,
+      new URLSearchParams(options),
+      {
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
+      }
+    );
+    return response.data;
+  } catch (error: any) {
+    console.log("failed to fetch google oauth tokens", error);
+    throw new Error(error.message);
+  }
 }
