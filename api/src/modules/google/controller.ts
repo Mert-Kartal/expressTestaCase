@@ -1,5 +1,7 @@
 import { Request, Response } from "express";
 import { getGoogleAuthURL, getGoogleOAuthToken } from "./service";
+import { createUser } from "../user/service";
+
 import jwt from "jsonwebtoken";
 export const googleAuthController = (req: Request, res: Response) => {
   const url = getGoogleAuthURL();
@@ -17,7 +19,19 @@ export const googleAuthCallbackController = async (
     console.log("ACCESS_TOKEN:", access_token);
     console.log("ID_TOKEN:", id_token);
     const googleUser = jwt.decode(id_token);
-    console.log(googleUser);
+    console.log("GOOGLE_USER:", googleUser);
+    // if (!googleUser) {
+    //   res.redirect("http://localhost:3000");
+    //   return;
+    // }
+    const user = await createUser({
+      name: googleUser.name,
+      email: googleUser.email,
+      googleId: googleUser.sub,
+      picture: googleUser.picture,
+    });
+    console.log(user);
+    res.status(200).json({ data: user, message: "success" });
   } catch (error: any) {
     console.log("ERROR:", error);
     res.redirect("http://localhost:3000");
