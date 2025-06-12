@@ -5,4 +5,5 @@ export const createUserSchema = z.object({
   email: z.string().email(),
   googleId: z.string(),
   picture: z.string(),
+  role: z.enum(["STUDENT", "TEACHER"]).default("STUDENT"),
 });

@@ -1,7 +1,6 @@
 import { Request, Response } from "express";
 import { getGoogleAuthURL, getGoogleOAuthToken } from "./service";
 import { createUser } from "../user/service";
-
 import jwt from "jsonwebtoken";
 export const googleAuthController = (req: Request, res: Response) => {
   const url = getGoogleAuthURL();
@@ -13,25 +12,44 @@ export const googleAuthCallbackController = async (
   res: Response
 ) => {
   const code = req.query.code;
-  console.log("CODE:", code);
   try {
-    const { access_token, id_token } = await getGoogleOAuthToken(code);
-    console.log("ACCESS_TOKEN:", access_token);
-    console.log("ID_TOKEN:", id_token);
+    const { id_token } = await getGoogleOAuthToken(code);
     const googleUser = jwt.decode(id_token);
-    console.log("GOOGLE_USER:", googleUser);
-    // if (!googleUser) {
-    //   res.redirect("http://localhost:3000");
-    //   return;
-    // }
+
+    if (!googleUser) {
+      res.redirect("http://localhost:3000");
+      return;
+    }
+
     const user = await createUser({
       name: googleUser.name,
       email: googleUser.email,
       googleId: googleUser.sub,
       picture: googleUser.picture,
     });
-    console.log(user);
-    res.status(200).json({ data: user, message: "success" });
+
+    res.cookie("refreshToken", user.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    if (user.message === "user signed up successfully") {
+      res.status(201).json({
+        data: {
+          user,
+        },
+        message: user.message,
+      });
+      return;
+    }
+
+    res.status(200).json({
+      data: {
+        user,
+      },
+      message: user.message,
+    });
   } catch (error: any) {
     console.log("ERROR:", error);
     res.redirect("http://localhost:3000");
