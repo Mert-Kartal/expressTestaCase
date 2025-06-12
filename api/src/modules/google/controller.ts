@@ -36,19 +36,13 @@ export const googleAuthCallbackController = async (
 
     if (user.message === "user signed up successfully") {
       res.status(201).json({
-        data: {
-          user,
-        },
-        message: user.message,
+        data: user,
       });
       return;
     }
 
     res.status(200).json({
-      data: {
-        user,
-      },
-      message: user.message,
+      data: user,
     });
   } catch (error: any) {
     console.log("ERROR:", error);
