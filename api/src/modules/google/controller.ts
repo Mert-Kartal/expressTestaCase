@@ -1,6 +1,11 @@
 import { Request, Response } from "express";
 import { getGoogleAuthURL, getGoogleOAuthToken } from "./service";
-import { createUser } from "../user/service";
+import {
+  createUser,
+  findUserByRefreshToken,
+  updateRefreshToken,
+  logoutUser,
+} from "../user/service";
 import {
   decodeGoogleIdToken,
   generateAccessToken,
@@ -41,9 +46,7 @@ export const googleAuthCallbackController = async (
     res.cookie("refreshToken", user.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-      path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 gün
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     if (user.message === "user signed up successfully") {
@@ -63,8 +66,20 @@ export const googleAuthCallbackController = async (
   }
 };
 
-export const googleLogoutController = (req: Request, res: Response) => {
+export const googleLogoutController = async (req: Request, res: Response) => {
   console.log("cookies:", req.cookies);
+
+  const refreshToken = req.cookies?.refreshToken;
+
+  // Service layer kullanarak logout
+  if (refreshToken) {
+    try {
+      await logoutUser(refreshToken);
+    } catch (error) {
+      console.log("Error during logout:", error);
+    }
+  }
+
   res.clearCookie("refreshToken", {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
@@ -74,16 +89,36 @@ export const googleLogoutController = (req: Request, res: Response) => {
   res.status(200).json({ message: "logged out successfully" });
 };
 
-export const googleRefreshController = (req: Request, res: Response) => {
+export const googleRefreshController = async (req: Request, res: Response) => {
   const refreshToken = req.cookies?.refreshToken;
 
   if (!refreshToken) {
     res.status(401).json({ message: "Refresh token missing" });
     return;
   }
+
   try {
+    // Service layer kullanarak user'ı bul
+    const user = await findUserByRefreshToken(refreshToken);
+
+    if (!user) {
+      res
+        .status(401)
+        .json({ message: "Invalid refresh token - not found in database" });
+      return;
+    }
+
+    // JWT token'ı verify et
     const decoded = verifyToken(refreshToken, refreshTokenSecret) as JwtPayload;
 
+    if (!decoded || decoded.id !== user.id) {
+      res
+        .status(401)
+        .json({ message: "Invalid refresh token - JWT verification failed" });
+      return;
+    }
+
+    // Yeni tokenlar generate et
     const accessToken = generateAccessToken({
       id: decoded.id,
       role: decoded.role,
@@ -93,6 +128,10 @@ export const googleRefreshController = (req: Request, res: Response) => {
       id: decoded.id,
     });
 
+    // Service layer kullanarak yeni refresh token'ı DB'ye kaydet
+    await updateRefreshToken(user.id, newRefreshToken);
+
+    // Yeni refresh token'ı cookie'ye set et
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
@@ -108,6 +147,7 @@ export const googleRefreshController = (req: Request, res: Response) => {
       },
     });
   } catch (error) {
+    console.log("Refresh token error:", error);
     res.status(401).json({ message: "Invalid refresh token" });
     return;
   }

@@ -19,13 +19,14 @@ enum Role {
 }
 
 model User {
-  id        String   @id @default(cuid())
-  email     String   @unique
-  name      String
-  picture   String
-  role      Role
-  googleId  String   @unique
-  createdAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String
+  picture      String
+  role         Role
+  googleId     String   @unique
+  refreshToken String?
+  createdAt    DateTime @default(now())
 
   tests       Test[]
   submissions Submission[]

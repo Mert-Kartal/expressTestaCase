@@ -14,3 +14,44 @@ export const getUserByGoogleId = async (googleId: string) => {
     },
   });
 };
+
+export const getUserById = async (id: string) => {
+  return await prisma.user.findUnique({
+    where: {
+      id,
+    },
+  });
+};
+
+export const updateUserRefreshToken = async (
+  userId: string,
+  refreshToken: string
+) => {
+  return await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      refreshToken,
+    },
+  });
+};
+
+export const getUserByRefreshToken = async (refreshToken: string) => {
+  return await prisma.user.findFirst({
+    where: {
+      refreshToken,
+    },
+  });
+};
+
+export const clearUserRefreshToken = async (userId: string) => {
+  return await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      refreshToken: null,
+    },
+  });
+};
