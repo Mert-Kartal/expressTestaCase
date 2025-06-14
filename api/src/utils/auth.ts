@@ -24,6 +24,7 @@ export const verifyToken = (token: string, secret: string) => {
   return decoded;
 };
 
-export const decodeToken = (token: string) => {
-  return jwt.decode(token);
+export const decodeGoogleIdToken = (id_token: string) => {
+  const decoded = jwt.decode(id_token);
+  return decoded;
 };
