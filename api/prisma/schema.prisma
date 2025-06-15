@@ -27,6 +27,7 @@ model User {
   googleId     String   @unique
   refreshToken String?
   createdAt    DateTime @default(now())
+  isRoleSet    Boolean  @default(false)
 
   tests       Test[]
   submissions Submission[]

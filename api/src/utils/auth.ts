@@ -24,6 +24,12 @@ export const verifyToken = (token: string, secret: string) => {
   return decoded;
 };
 
+export const generateTokenPair = (id: string, role: string) => {
+  const accessToken = generateAccessToken({ id, role });
+  const refreshToken = generateRefreshToken({ id });
+  return { accessToken, refreshToken };
+};
+
 export const decodeGoogleIdToken = (id_token: string) => {
   const decoded = jwt.decode(id_token);
   return decoded;

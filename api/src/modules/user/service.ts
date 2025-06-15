@@ -4,38 +4,39 @@ import {
   updateUserRefreshToken,
   getUserByRefreshToken,
   clearUserRefreshToken,
+  getUserById,
+  updateUserRole,
 } from "./repository";
 import { CreateUser } from "./types";
-import { generateAccessToken, generateRefreshToken } from "../../utils/auth";
+import { generateTokenPair } from "../../utils/auth";
 
 export const createUser = async (data: CreateUser) => {
-  const user = await getUserByGoogleId(data.googleId);
-  if (!!user) {
-    const accessToken = generateAccessToken({ id: user.id, role: user.role });
-    const refreshToken = generateRefreshToken({ id: user.id });
+  const existUser = await getUserByGoogleId(data.googleId);
+  if (existUser) {
+    const { accessToken, refreshToken } = generateTokenPair(
+      existUser.id,
+      existUser.role
+    );
 
-    // Refresh token'ı DB'ye kaydet
-    await updateUserRefreshToken(user.id, refreshToken);
+    await updateUserRefreshToken(existUser.id, refreshToken);
 
     return {
-      user,
+      ...existUser,
       accessToken,
       refreshToken,
       message: "user logged in successfully",
     };
   }
   const createdUser = await addUser(data);
-  const accessToken = generateAccessToken({
-    id: createdUser.id,
-    role: createdUser.role,
-  });
-  const refreshToken = generateRefreshToken({ id: createdUser.id });
+  const { accessToken, refreshToken } = generateTokenPair(
+    createdUser.id,
+    createdUser.role
+  );
 
-  // Refresh token'ı DB'ye kaydet
   await updateUserRefreshToken(createdUser.id, refreshToken);
 
   return {
-    user: createdUser,
+    ...createdUser,
     accessToken,
     refreshToken,
     message: "user signed up successfully",
@@ -64,4 +65,15 @@ export const logoutUser = async (refreshToken: string) => {
     return { success: true, message: "User logged out successfully" };
   }
   return { success: false, message: "User not found" };
+};
+
+export const getUser = async (id: string) => {
+  return await getUserById(id);
+};
+
+export const setUserRole = async (
+  userId: string,
+  role: "STUDENT" | "TEACHER"
+) => {
+  return await updateUserRole(userId, role);
 };

@@ -5,11 +5,12 @@ import {
   findUserByRefreshToken,
   updateRefreshToken,
   logoutUser,
+  getUser,
+  setUserRole,
 } from "../user/service";
 import {
   decodeGoogleIdToken,
-  generateAccessToken,
-  generateRefreshToken,
+  generateTokenPair,
   verifyToken,
 } from "../../utils/auth";
 import { GoogleUserDecodeType } from "./types";
@@ -17,8 +18,13 @@ import { refreshTokenSecret } from "../../config/data";
 import { JwtPayload } from "jsonwebtoken";
 
 export const googleAuthController = (req: Request, res: Response) => {
-  const url = getGoogleAuthURL();
-  res.redirect(url);
+  try {
+    const url = getGoogleAuthURL();
+    res.redirect(url);
+  } catch (error) {
+    console.log("Error during google auth:", error);
+    res.redirect("http://localhost:3000");
+  }
 };
 
 export const googleAuthCallbackController = async (
@@ -27,6 +33,11 @@ export const googleAuthCallbackController = async (
 ) => {
   const code = req.query.code;
   try {
+    if (!code) {
+      res.status(400).json({ message: "No code provided" });
+      return;
+    }
+
     const { id_token } = await getGoogleOAuthToken(code);
     const googleUser: GoogleUserDecodeType = decodeGoogleIdToken(id_token);
 
@@ -40,7 +51,6 @@ export const googleAuthCallbackController = async (
       email: googleUser.email,
       googleId: googleUser.sub,
       picture: googleUser.picture,
-      role: "STUDENT",
     });
 
     res.cookie("refreshToken", user.refreshToken, {
@@ -56,13 +66,18 @@ export const googleAuthCallbackController = async (
       return;
     }
 
+    // if (user.isRoleSet === false) {
+    // TODO: role seçimi ekranına yolla
+    //   res.redirect("http://localhost:3000/api/auth/role");
+    //   return;
+    // }
+
     res.status(200).json({
       data: user,
     });
   } catch (error: any) {
     console.log("ERROR:", error);
     res.redirect("http://localhost:3000");
-    //login sayfasına yönlendir
   }
 };
 
@@ -71,22 +86,22 @@ export const googleLogoutController = async (req: Request, res: Response) => {
 
   const refreshToken = req.cookies?.refreshToken;
 
-  // Service layer kullanarak logout
-  if (refreshToken) {
-    try {
+  try {
+    if (refreshToken) {
       await logoutUser(refreshToken);
-    } catch (error) {
-      console.log("Error during logout:", error);
     }
-  }
 
-  res.clearCookie("refreshToken", {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
-    path: "/",
-  });
-  res.status(200).json({ message: "logged out successfully" });
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      path: "/",
+    });
+
+    res.status(200).json({ message: "logged out successfully" });
+  } catch (error) {
+    console.log("Error during logout:", error);
+  }
 };
 
 export const googleRefreshController = async (req: Request, res: Response) => {
@@ -98,7 +113,7 @@ export const googleRefreshController = async (req: Request, res: Response) => {
   }
 
   try {
-    // Service layer kullanarak user'ı bul
+    //düzenle bu kısmı service ile
     const user = await findUserByRefreshToken(refreshToken);
 
     if (!user) {
@@ -108,7 +123,6 @@ export const googleRefreshController = async (req: Request, res: Response) => {
       return;
     }
 
-    // JWT token'ı verify et
     const decoded = verifyToken(refreshToken, refreshTokenSecret) as JwtPayload;
 
     if (!decoded || decoded.id !== user.id) {
@@ -118,26 +132,19 @@ export const googleRefreshController = async (req: Request, res: Response) => {
       return;
     }
 
-    // Yeni tokenlar generate et
-    const accessToken = generateAccessToken({
-      id: decoded.id,
-      role: decoded.role,
-    });
+    const { accessToken, refreshToken: newRefreshToken } = generateTokenPair(
+      user.id,
+      user.role
+    );
 
-    const newRefreshToken = generateRefreshToken({
-      id: decoded.id,
-    });
-
-    // Service layer kullanarak yeni refresh token'ı DB'ye kaydet
     await updateRefreshToken(user.id, newRefreshToken);
 
-    // Yeni refresh token'ı cookie'ye set et
     res.cookie("refreshToken", newRefreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
       path: "/",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 gün
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.status(200).json({
@@ -151,6 +158,28 @@ export const googleRefreshController = async (req: Request, res: Response) => {
     res.status(401).json({ message: "Invalid refresh token" });
     return;
   }
+};
+
+export const googleRoleController = async (req: Request, res: Response) => {
+  const userId = req.user.id;
+  const user = await getUser(userId);
+  const role = req.body.role;
+  if (!role) {
+    res.status(400).json({ message: "Role is required" });
+    return;
+  }
+  if (user?.isRoleSet) {
+    res.status(400).json({ message: "User already has a role" });
+    return;
+  }
+
+  if (role !== "STUDENT" && role !== "TEACHER") {
+    res.status(400).json({ message: "Invalid role" });
+    return;
+  }
+
+  await setUserRole(userId, role);
+  res.status(200).json({ message: "Role updated successfully" });
 };
 
 /*

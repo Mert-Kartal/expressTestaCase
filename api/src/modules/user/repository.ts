@@ -55,3 +55,18 @@ export const clearUserRefreshToken = async (userId: string) => {
     },
   });
 };
+
+export const updateUserRole = async (
+  userId: string,
+  role: "STUDENT" | "TEACHER"
+) => {
+  return await prisma.user.update({
+    where: {
+      id: userId,
+    },
+    data: {
+      role,
+      isRoleSet: true,
+    },
+  });
+};
