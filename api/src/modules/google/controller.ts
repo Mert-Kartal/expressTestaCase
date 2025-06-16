@@ -1,4 +1,4 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { getGoogleAuthURL, getGoogleOAuthToken } from "./service";
 import {
   createUser,
@@ -16,34 +16,41 @@ import {
 import { GoogleUserDecodeType } from "./types";
 import { refreshTokenSecret } from "../../config/data";
 import { JwtPayload } from "jsonwebtoken";
+import { AppError } from "../../utils/appError";
 
-export const googleAuthController = (req: Request, res: Response) => {
+export const googleAuthController = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
     const url = getGoogleAuthURL();
     res.redirect(url);
   } catch (error) {
-    console.log("Error during google auth:", error);
-    res.redirect("http://localhost:3000");
+    next(new AppError("Failed to get Google auth URL", 500));
   }
 };
 
 export const googleAuthCallbackController = async (
   req: Request<{}, {}, {}, { code: string }>,
-  res: Response
+  res: Response,
+  next: NextFunction
 ) => {
   const code = req.query.code;
   try {
     if (!code) {
-      res.status(400).json({ message: "No code provided" });
-      return;
+      return next(new AppError("No code provided", 400));
     }
 
     const { id_token } = await getGoogleOAuthToken(code);
-    const googleUser: GoogleUserDecodeType = decodeGoogleIdToken(id_token);
+    const googleUser: GoogleUserDecodeType = decodeGoogleIdToken(
+      id_token
+    ) as GoogleUserDecodeType;
 
     if (!googleUser) {
-      res.redirect("http://localhost:3000");
-      return;
+      return next(
+        new AppError("Failed to decode Google user information", 400)
+      );
     }
 
     const user = await createUser({
@@ -66,22 +73,24 @@ export const googleAuthCallbackController = async (
       return;
     }
 
-    // if (user.isRoleSet === false) {
-    // TODO: role seçimi ekranına yolla
-    //   res.redirect("http://localhost:3000/api/auth/role");
-    //   return;
-    // }
+    if (user.isRoleSet === false) {
+      res.redirect("http://localhost:3000/api/auth/role");
+      return;
+    }
 
     res.status(200).json({
       data: user,
     });
   } catch (error: any) {
-    console.log("ERROR:", error);
-    res.redirect("http://localhost:3000");
+    next(new AppError("Authentication process failed", 500));
   }
 };
 
-export const googleLogoutController = async (req: Request, res: Response) => {
+export const googleLogoutController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   console.log("cookies:", req.cookies);
 
   const refreshToken = req.cookies?.refreshToken;
@@ -100,36 +109,34 @@ export const googleLogoutController = async (req: Request, res: Response) => {
 
     res.status(200).json({ message: "logged out successfully" });
   } catch (error) {
-    console.log("Error during logout:", error);
+    next(new AppError("Logout failed", 500));
   }
 };
 
-export const googleRefreshController = async (req: Request, res: Response) => {
+export const googleRefreshController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   const refreshToken = req.cookies?.refreshToken;
 
   if (!refreshToken) {
-    res.status(401).json({ message: "Refresh token missing" });
-    return;
+    return next(new AppError("Refresh token missing", 401));
   }
 
   try {
-    //düzenle bu kısmı service ile
     const user = await findUserByRefreshToken(refreshToken);
 
     if (!user) {
-      res
-        .status(401)
-        .json({ message: "Invalid refresh token - not found in database" });
-      return;
+      return next(
+        new AppError("Invalid refresh token - not found in database", 401)
+      );
     }
 
     const decoded = verifyToken(refreshToken, refreshTokenSecret) as JwtPayload;
 
     if (!decoded || decoded.id !== user.id) {
-      res
-        .status(401)
-        .json({ message: "Invalid refresh token - JWT verification failed" });
-      return;
+      return next(new AppError("Token refresh failed", 401));
     }
 
     const { accessToken, refreshToken: newRefreshToken } = generateTokenPair(
@@ -154,35 +161,33 @@ export const googleRefreshController = async (req: Request, res: Response) => {
       },
     });
   } catch (error) {
-    console.log("Refresh token error:", error);
-    res.status(401).json({ message: "Invalid refresh token" });
-    return;
+    next(error);
   }
 };
 
-export const googleRoleController = async (req: Request, res: Response) => {
+export const googleRoleController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   const userId = req.user.id;
   const user = await getUser(userId);
   const role = req.body.role;
   if (!role) {
-    res.status(400).json({ message: "Role is required" });
-    return;
+    return next(new AppError("Role is required", 400));
   }
   if (user?.isRoleSet) {
-    res.status(400).json({ message: "User already has a role" });
-    return;
+    return next(new AppError("User already has a role", 400));
   }
 
   if (role !== "STUDENT" && role !== "TEACHER") {
-    res.status(400).json({ message: "Invalid role" });
-    return;
+    return next(new AppError("Invalid role", 400));
   }
 
-  await setUserRole(userId, role);
-  res.status(200).json({ message: "Role updated successfully" });
+  try {
+    await setUserRole(userId, role);
+    res.status(200).json({ message: "Role updated successfully" });
+  } catch (error) {
+    next(new AppError("Failed to update user role", 500));
+  }
 };
-
-/*
-TODO
-error handling middleware
-*/

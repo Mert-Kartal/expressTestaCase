@@ -5,6 +5,7 @@ import {
   google_redirect_uri,
 } from "../../config/data";
 import { GoogleTokenResponse } from "./types";
+import { AppError } from "../../utils/appError";
 
 export function getGoogleAuthURL() {
   const rootUrl = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -47,7 +48,6 @@ export async function getGoogleOAuthToken(
     );
     return response.data;
   } catch (error: any) {
-    console.log("failed to fetch google oauth tokens", error);
-    throw new Error(error.message);
+    throw new AppError(error.message, 500);
   }
 }

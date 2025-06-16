@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { verifyToken } from "../utils/auth";
 import { accessTokenSecret } from "../config/data";
+import { AppError } from "../utils/appError";
 
 declare global {
   namespace Express {
@@ -18,8 +19,7 @@ export const authMiddleware = async (
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      res.status(401).json({ message: "token required" });
-      return;
+      return next(new AppError("token required", 401));
     }
 
     const token = authHeader.split(" ")[1];
@@ -29,7 +29,17 @@ export const authMiddleware = async (
     req.user = decoded as { id: string; role: string };
     next();
   } catch (error) {
-    res.status(401).json({ message: "unauthorized" });
-    return;
+    next(error);
   }
+};
+
+export const roleAuthorizationMiddleware = (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  if (req.user.role !== "TEACHER") {
+    return next(new AppError("unauthorized", 403));
+  }
+  next();
 };

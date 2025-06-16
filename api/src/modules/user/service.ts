@@ -9,6 +9,7 @@ import {
 } from "./repository";
 import { CreateUser } from "./types";
 import { generateTokenPair } from "../../utils/auth";
+import { AppError } from "../../utils/appError";
 
 export const createUser = async (data: CreateUser) => {
   const existUser = await getUserByGoogleId(data.googleId);
@@ -64,7 +65,7 @@ export const logoutUser = async (refreshToken: string) => {
     await clearUserRefreshToken(user.id);
     return { success: true, message: "User logged out successfully" };
   }
-  return { success: false, message: "User not found" };
+  throw new AppError("User not found", 404);
 };
 
 export const getUser = async (id: string) => {
