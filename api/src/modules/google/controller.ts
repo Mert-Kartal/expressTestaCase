@@ -5,7 +5,7 @@ import {
   findUserByRefreshToken,
   updateRefreshToken,
   logoutUser,
-  getUser,
+  findUser,
   setUserRole,
 } from "../user/service";
 import {
@@ -171,7 +171,7 @@ export const googleRoleController = async (
   next: NextFunction
 ) => {
   const userId = req.user.id;
-  const user = await getUser(userId);
+  const user = await findUser(userId);
   const role = req.body.role;
   if (!role) {
     return next(new AppError("Role is required", 400));

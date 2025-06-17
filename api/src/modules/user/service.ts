@@ -6,6 +6,7 @@ import {
   clearUserRefreshToken,
   getUserById,
   updateUserRole,
+  getAllUsers,
 } from "./repository";
 import { CreateUser } from "./types";
 import { generateTokenPair } from "../../utils/auth";
@@ -68,7 +69,7 @@ export const logoutUser = async (refreshToken: string) => {
   throw new AppError("User not found", 404);
 };
 
-export const getUser = async (id: string) => {
+export const findUser = async (id: string) => {
   return await getUserById(id);
 };
 
@@ -77,4 +78,8 @@ export const setUserRole = async (
   role: "STUDENT" | "TEACHER"
 ) => {
   return await updateUserRole(userId, role);
+};
+
+export const findUsers = async () => {
+  return await getAllUsers();
 };

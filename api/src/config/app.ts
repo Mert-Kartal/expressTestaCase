@@ -3,6 +3,7 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { googleRouter } from "../modules/google";
+import { userRouter } from "../modules/user";
 import { errorHandler, notFoundHandler } from "../middleware/error";
 
 const app = express();
@@ -12,6 +13,7 @@ app.use(cors());
 app.use(cookieParser());
 
 app.use("/api/auth", googleRouter);
+app.use("/api/users", userRouter);
 
 app.get("/", (req, res) => {
   res.send("Hello World!");

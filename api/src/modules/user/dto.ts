@@ -6,3 +6,5 @@ export const createUserSchema = z.object({
   googleId: z.string(),
   picture: z.string(),
 });
+
+export const idSchema = z.string().uuid();

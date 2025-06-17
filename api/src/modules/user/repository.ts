@@ -70,3 +70,7 @@ export const updateUserRole = async (
     },
   });
 };
+
+export const getAllUsers = async () => {
+  return await prisma.user.findMany();
+};

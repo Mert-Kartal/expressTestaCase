@@ -1,4 +1,5 @@
 import { z } from "zod";
-import { createUserSchema } from "./dto";
+import { createUserSchema, idSchema } from "./dto";
 
 export type CreateUser = z.infer<typeof createUserSchema>;
+export type Id = z.infer<typeof idSchema>;
